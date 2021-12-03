@@ -1,0 +1,113 @@
+---
+title: "P8105 Homework 6"
+author: "Yihan Qiu"
+output: github_document
+---
+
+```{r setup, include = FALSE}
+library(tidyverse)
+library(mgcv)
+library(modelr)
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.asp = .6,
+  out.width = "90%"
+)
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+```
+
+## Problem 1
+
+The code chunk below loads and cleans the data for regression analysis.
+
+```{r}
+birthweight_data =
+  read_csv("p8105_hw6_data/birthweight.csv") %>%
+  janitor::clean_names() %>%
+  mutate(
+    babysex = as.factor(babysex),
+    frace = as.factor(frace),
+    malform = as.factor(malform),
+    mrace = as.factor(mrace))
+
+map(.x = birthweight_data, ~sum(is.na(.x)))
+
+birthweight_data
+```
+
+The code chunk below proposes a model for regression.
+
+```{r}
+model_1 = lm(bwt ~ babysex + bhead + blength + delwt + fincome + gaweeks + malform + wtgain, data = birthweight_data)
+
+broom::tidy(model_1)
+```
+
+The code chunk below shows a plot of model residuals against fitted values.
+
+```{r}
+birthweight_data %>%
+  add_predictions(model_1) %>%
+  add_residuals(model_1) %>%
+  ggplot(aes(x = pred, y = resid)) +
+  geom_point() +
+  labs(x = "fitted values", y = "residuals")
+```
+
+The code chunk below fits the other two models.
+
+```{r}
+model_2 = lm(bwt ~ blength + gaweeks, data = birthweight_data)
+broom::tidy(model_2)
+
+model_3 = lm(bwt ~ bhead + blength + babysex +
+               bhead * blength + bhead * babysex + blength * babysex +
+               bhead * blength * babysex, data = birthweight_data)
+broom::tidy(model_3)
+```
+
+The code chunk below makes the comparison of three models in terms of the cross-validated prediction error.
+
+```{r}
+set.seed(1)
+cv = crossv_mc(birthweight_data, 100) %>%
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble)
+  ) %>%
+  mutate(
+    model_1 = map(.x = train, ~lm(bwt ~ babysex + bhead + blength + delwt + fincome + gaweeks + malform + wtgain, data = .x)),
+    model_2 = map(.x = train, ~lm(bwt ~ blength + gaweeks, data = .x)),
+    model_3 = map(.x = train, ~lm(bwt ~ bhead + blength + babysex +
+               bhead * blength + bhead * babysex + blength * babysex +
+               bhead * blength * babysex, data = birthweight_data))) %>%
+  mutate(rmse_model_1 = map2_dbl(.x = model_1, .y = test, ~rmse(model = .x, data = .y)),
+         rmse_model_2 = map2_dbl(.x = model_2, .y = test, ~rmse(model = .x, data = .y)),
+         rmse_model_3 = map2_dbl(.x = model_3, .y = test, ~rmse(model = .x, data = .y)))
+
+cv
+```
+
+The code chunk below looks at RMSE distributions of three models.
+
+```{r}
+cv %>%
+  select(starts_with("rmse")) %>%
+  pivot_longer(rmse_model_1:rmse_model_3,
+               names_to = "model",
+               values_to = "rmse",
+               names_prefix = "rmse_") %>%
+  ggplot(aes(x = model, y = rmse)) + 
+  geom_boxplot()
+```
+
+From the boxplot above, we can see that the model I proposed has the smallest predicion error overall, while the model using length at birth and gestational age as predictors has the largest error in general.
