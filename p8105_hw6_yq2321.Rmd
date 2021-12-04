@@ -47,10 +47,19 @@ birthweight_data
 There is no missing value in this dataset.
 
 
-The code chunk below proposes a model for regression.
+The code chunk below proposes a model for regression. To ensure its validity and reliability, I will use the backward elimination method to construct this model. This method first starts with all predictors in the model and removes the predictor with the highest p-value one at a time until all non-significant predictors have been removed.
 
 ```{r}
-model_1 = lm(bwt ~ babysex + bhead + blength + delwt + fincome + gaweeks + malform + wtgain, data = birthweight_data)
+full_reg = lm(bwt ~ ., data = birthweight_data)
+backward_elimation = step(full_reg, direction = 'backward')
+summary(backward_elimation)
+```
+
+From the summary above, we can see that predictors babysex, bhead, blength, dewlt, fincome, gaweeks, mheight, mrace, parity, ppwt, and smoken are significant. Therefore, I decide to include all of them in my model.
+
+```{r}
+model_1 = lm(bwt ~ babysex + bhead + blength + delwt + fincome + 
+    gaweeks + mheight + mrace + parity + ppwt + smoken, data = birthweight_data)
 
 broom::tidy(model_1)
 ```
